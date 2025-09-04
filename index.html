@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>AI 교육 도우미</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+			font-family: 'Segoe UI', Arial, sans-serif;
+			background: linear-gradient(135deg, #e0e7ff 0%, #f5f7fa 100%);
+			height: 100vh;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+		}
+		.chat-container {
+			background: #fff;
+			box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+			border-radius: 16px;
+			width: 400px;
+			max-width: 90vw;
+			padding: 32px 24px 16px 24px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+		.title {
+			font-size: 1.3rem;
+			font-weight: 600;
+			margin-bottom: 18px;
+			color: #3b3b3b;
+			text-align: center;
+		}
+		.chat-box {
+			width: 100%;
+			min-height: 180px;
+			max-height: 260px;
+			overflow-y: auto;
+			background: #f3f6fa;
+			border-radius: 8px;
+			margin-bottom: 18px;
+			padding: 12px;
+			box-sizing: border-box;
+		}
+		.message {
+			margin-bottom: 12px;
+			display: flex;
+			flex-direction: column;
+		}
+		.user {
+			align-self: flex-end;
+			background: #dbeafe;
+			color: #1e293b;
+			border-radius: 12px 12px 0 12px;
+			padding: 8px 14px;
+			max-width: 80%;
+			font-size: 1rem;
+		}
+		.ai {
+			align-self: flex-start;
+			background: #e0e7ff;
+			color: #334155;
+			border-radius: 12px 12px 12px 0;
+			padding: 8px 14px;
+			max-width: 80%;
+			font-size: 1rem;
+		}
+		.input-area {
+			width: 100%;
+			display: flex;
+			gap: 8px;
+		}
+		.input-area input {
+			flex: 1;
+			padding: 10px;
+			border-radius: 8px;
+			border: 1px solid #cbd5e1;
+			font-size: 1rem;
+			outline: none;
+		}
+		.input-area button {
+			padding: 10px 18px;
+			border-radius: 8px;
+			border: none;
+			background: #6366f1;
+			color: #fff;
+			font-size: 1rem;
+			cursor: pointer;
+			transition: background 0.2s;
+		}
+		.input-area button:hover {
+			background: #4338ca;
+		}
+	</style>
+</head>
+<body>
+	<div class="chat-container">
+		<div class="title">무엇이 필요하신가요?</div>
+		<div class="chat-box" id="chatBox">
+			<!-- 메시지 출력 영역 -->
+		</div>
+		<form class="input-area" id="chatForm">
+			<input type="text" id="userInput" placeholder="궁금한 점을 입력하세요..." autocomplete="off" required />
+			<button type="submit">질문</button>
+		</form>
+	</div>
+	<script>
+		const chatBox = document.getElementById('chatBox');
+		const chatForm = document.getElementById('chatForm');
+		const userInput = document.getElementById('userInput');
+
+		// AI 답변 예시 (실제 AI 연동은 서버/API 필요)
+		function getAIResponse(question) {
+			// 실제 서비스에서는 여러 AI API를 통합하여 답변을 선택해야 함
+			// 여기서는 예시 답변만 반환
+			const answers = [
+				'문제를 자세히 설명해주시면 더 정확한 도움을 드릴 수 있어요!',
+				'이 문제는 수학의 함수 개념과 관련이 있습니다. 혹시 함수의 정의를 알고 계신가요?',
+				'비슷한 질문이 있었는데, AI 서비스들은 이렇게 답변했어요: ...',
+				'조금 더 구체적으로 질문해주시면 여러 AI의 답변을 비교해드릴 수 있습니다.'
+			];
+			// 랜덤 답변
+			return answers[Math.floor(Math.random() * answers.length)];
+		}
+
+		function addMessage(text, sender) {
+			const msgDiv = document.createElement('div');
+			msgDiv.className = 'message';
+			const bubble = document.createElement('div');
+			bubble.className = sender;
+			bubble.textContent = text;
+			msgDiv.appendChild(bubble);
+			chatBox.appendChild(msgDiv);
+			chatBox.scrollTop = chatBox.scrollHeight;
+		}
+
+		chatForm.addEventListener('submit', function(e) {
+			e.preventDefault();
+			const question = userInput.value.trim();
+			if (!question) return;
+			addMessage(question, 'user');
+			userInput.value = '';
+			setTimeout(() => {
+				const aiReply = getAIResponse(question);
+				addMessage(aiReply, 'ai');
+			}, 700); // 답변 딜레이
+		});
+	</script>
+</body>
+</html>
