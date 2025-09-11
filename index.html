@@ -110,139 +110,213 @@
 		<div class="extra-questions" id="extraQuestions" style="width:100%;margin-top:10px;display:none;"></div>
 	</div>
 	<script>
-	// 대화 히스토리 및 상태 관리
-	const chatBox = document.getElementById('chatBox');
-	const chatForm = document.getElementById('chatForm');
-	const userInput = document.getElementById('userInput');
-	const chatHistoryList = document.getElementById('chatHistoryList');
-	const extraQuestions = document.getElementById('extraQuestions');
+// 세션 기반 대화 및 상태 관리
+const chatBox = document.getElementById('chatBox');
+const chatForm = document.getElementById('chatForm');
+const userInput = document.getElementById('userInput');
+const chatHistoryList = document.getElementById('chatHistoryList');
+const extraQuestions = document.getElementById('extraQuestions');
 
-	let chatHistories = [];
-	let currentChat = [];
-	let lastQuestion = '';
+let sessions = [];
+let currentSession = {
+    id: Date.now(),
+    title: '',
+    summary: '',
+    timestamp: new Date(),
+    chat: [],
+    questions: [],
+    answers: []
+};
+let lastQuestion = '';
 
-	// AI 모델별 답변 예시
-	const aiModels = [
-		{name: 'ChatGPT',
-		 reply: q => `ChatGPT의 답변입니다: \n${q}에 대해 자세히 설명드릴 수 있습니다. 궁금하신 점을 구체적으로 말씀해주시면 더욱 정확한 답변을 드릴 수 있습니다.`},
-		{name: 'Bard',
-		 reply: q => `Bard의 답변입니다: \n${q}에 대해 다양한 관점에서 설명드릴 수 있습니다. 추가로 궁금하신 점이 있으신가요?`},
-		{name: 'Claude',
-		 reply: q => `Claude의 답변입니다: \n${q}에 대해 친절하게 안내해드릴 수 있습니다. 더 자세한 설명이 필요하시면 말씀해 주세요.`}
-	];
+const aiModels = [
+    {name: 'ChatGPT', reply: q => `ChatGPT의 답변입니다: \n${q}에 대해 자세히 설명드릴 수 있습니다. 궁금하신 점을 구체적으로 말씀해주시면 더욱 정확한 답변을 드릴 수 있습니다.`},
+    {name: 'Bard', reply: q => `Bard의 답변입니다: \n${q}에 대해 다양한 관점에서 설명드릴 수 있습니다. 추가로 궁금하신 점이 있으신가요?`},
+    {name: 'Claude', reply: q => `Claude의 답변입니다: \n${q}에 대해 친절하게 안내해드릴 수 있습니다. 더 자세한 설명이 필요하시면 말씀해 주세요.`}
+];
 
-	// 유튜브 검색 (간단한 예시, 실제 API 연동 필요)
-	function getYoutubeLink(question) {
-		const query = encodeURIComponent(question);
-		return `https://www.youtube.com/results?search_query=${query}`;
-	}
+function getYoutubeLink(question) {
+    const query = encodeURIComponent(question);
+    return `https://www.youtube.com/results?search_query=${query}`;
+}
 
-	// 추가 질문 예측 (간단 예시)
-	function predictExtraQuestions(question) {
-		if (question.includes('함수')) {
-			return ['그래프를 그려서 확인해보시겠습니까?', '함수의 실생활 예시가 궁금하신가요?'];
-		}
-		if (question.includes('미분')) {
-			return ['미분의 기하학적 의미를 설명해드릴까요?', '미분과 적분의 차이가 궁금하신가요?'];
-		}
-		return ['관련된 예시를 더 들어드릴까요?', '이와 비슷한 다른 개념이 궁금하신가요?'];
-	}
+function predictExtraQuestions(question, aiAnswer) {
+    let suggestions = [];
+    if ((question+aiAnswer).includes('함수')) {
+        suggestions.push('함수의 그래프를 그려볼까요?');
+        suggestions.push('함수의 실생활 예시를 더 들어드릴까요?');
+    }
+    if ((question+aiAnswer).includes('미분')) {
+        suggestions.push('미분의 기하학적 의미를 설명해드릴까요?');
+        suggestions.push('미분과 적분의 차이가 궁금하신가요?');
+    }
+    if (suggestions.length === 0) {
+        suggestions.push('관련된 예시를 더 들어드릴까요?');
+        suggestions.push('이와 비슷한 다른 개념이 궁금하신가요?');
+    }
+    return suggestions;
+}
 
-	function addMessage(text, sender) {
-		const msgDiv = document.createElement('div');
-		msgDiv.className = 'message';
-		const bubble = document.createElement('div');
-		bubble.className = sender;
-		bubble.textContent = text;
-		msgDiv.appendChild(bubble);
-		chatBox.appendChild(msgDiv);
-		chatBox.scrollTop = chatBox.scrollHeight;
-		currentChat.push({text, sender});
-	}
+function addMessage(text, sender) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message';
+    const bubble = document.createElement('div');
+    bubble.className = sender;
+    bubble.textContent = text;
+    msgDiv.appendChild(bubble);
+    chatBox.appendChild(msgDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    currentSession.chat.push({text, sender});
+    if(sender === 'user') currentSession.questions.push(text);
+    if(sender === 'ai') currentSession.answers.push(text);
+}
 
-	function showExtraQuestions(question) {
-		extraQuestions.innerHTML = '';
-		const preds = predictExtraQuestions(question);
-		preds.forEach(q => {
-			const btn = document.createElement('button');
-			btn.textContent = q;
-			btn.style.marginRight = '8px';
-			btn.style.marginBottom = '4px';
-			btn.type = 'button'; // submit 방지
-			btn.onclick = () => {
-				userInput.value = q;
-				userInput.focus();
-			};
-			extraQuestions.appendChild(btn);
-		});
-		extraQuestions.style.display = 'block';
-	}
+function showExtraQuestions(question, aiAnswer) {
+    extraQuestions.innerHTML = '';
+    const preds = predictExtraQuestions(question, aiAnswer);
+    preds.forEach(q => {
+        const btn = document.createElement('button');
+        btn.textContent = q;
+        btn.style.marginRight = '8px';
+        btn.style.marginBottom = '4px';
+        btn.type = 'button';
+        btn.onclick = () => {
+            userInput.value = q;
+            userInput.focus();
+        };
+        extraQuestions.appendChild(btn);
+    });
+    extraQuestions.style.display = 'block';
+}
 
-	function hideExtraQuestions() {
-		extraQuestions.style.display = 'none';
-	}
+function hideExtraQuestions() {
+    extraQuestions.style.display = 'none';
+}
 
-	function saveCurrentChat(question) {
-		if (currentChat.length > 0) {
-			chatHistories.push({question: lastQuestion, chat: currentChat});
-			updateHistoryList();
-			currentChat = [];
-		}
-		lastQuestion = question;
-	}
+function saveCurrentSession() {
+    if (currentSession.chat.length > 0) {
+        currentSession.summary = generateSessionSummary(currentSession);
+        currentSession.title = currentSession.questions[0] ? currentSession.questions[0].slice(0, 20) : '새로운 대화';
+        currentSession.timestamp = new Date();
+        sessions.unshift({...currentSession});
+        updateHistoryList();
+        currentSession = {
+            id: Date.now(),
+            title: '',
+            summary: '',
+            timestamp: new Date(),
+            chat: [],
+            questions: [],
+            answers: []
+        };
+    }
+}
 
-	function updateHistoryList() {
-		if (chatHistories.length === 0) {
-			chatHistoryList.style.display = 'none';
-			return;
-		}
-		chatHistoryList.innerHTML = '<b>이전 대화 목록:</b><br>';
-		chatHistories.forEach((h, idx) => {
-			const btn = document.createElement('button');
-			btn.textContent = h.question;
-			btn.style.marginRight = '8px';
-			btn.type = 'button'; // submit 방지
-			btn.onclick = () => {
-				chatBox.innerHTML = '';
-				currentChat = [...h.chat]; // currentChat을 해당 대화로 교체
-				lastQuestion = h.question;
-				h.chat.forEach(m => addMessage(m.text, m.sender));
-				hideExtraQuestions();
-			};
-			chatHistoryList.appendChild(btn);
-		});
-		chatHistoryList.style.display = 'block';
-	}
+function updateHistoryList() {
+    if (sessions.length === 0) {
+        chatHistoryList.style.display = 'none';
+        return;
+    }
+    chatHistoryList.innerHTML = '<b>이전 대화 목록:</b><br>';
+    sessions.forEach((s, idx) => {
+        const btn = document.createElement('button');
+        btn.textContent = `${s.title} (${formatTimestamp(s.timestamp)})`;
+        btn.style.marginRight = '8px';
+        btn.type = 'button';
+        btn.onclick = () => {
+            chatBox.innerHTML = '';
+            s.chat.forEach(m => addMessage(m.text, m.sender));
+            hideExtraQuestions();
+            showSessionSummary(s);
+        };
+        chatHistoryList.appendChild(btn);
+        const exportBtn = document.createElement('button');
+        exportBtn.textContent = '내보내기';
+        exportBtn.style.marginRight = '8px';
+        exportBtn.type = 'button';
+        exportBtn.onclick = () => exportSessionAsMarkdown(s);
+        chatHistoryList.appendChild(exportBtn);
+    });
+    chatHistoryList.style.display = 'block';
+}
 
-	function getAIResponses(question) {
-		// 여러 AI 모델의 답변을 모아 정리
-		return aiModels.map(model => model.reply(question));
-	}
+function formatTimestamp(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`;
+}
 
-	chatForm.addEventListener('submit', function(e) {
-		e.preventDefault();
-		const question = userInput.value.trim();
-		if (!question) return;
+function getAIResponses(question) {
+    return aiModels.map(model => model.reply(question));
+}
 
-		// 새로운 질문이면 이전 대화 저장
-		if (currentChat.length > 0 && question !== lastQuestion) {
-			saveCurrentChat(question);
-			chatBox.innerHTML = '';
-		}
+function generateSessionSummary(session) {
+    let summary = `# 대화 요약 (FAQ/스터디 가이드)\n\n`;
+    session.questions.forEach((q, i) => {
+        summary += `**Q${i+1}.** ${q}\n`;
+        if(session.answers[i]) summary += `**A${i+1}.** ${session.answers[i]}\n`;
+    });
+    return summary;
+}
 
-		addMessage(question, 'user');
-		userInput.value = '';
-		hideExtraQuestions();
+function showSessionSummary(session) {
+    let summaryDiv = document.getElementById('sessionSummary');
+    if (!summaryDiv) {
+        summaryDiv = document.createElement('div');
+        summaryDiv.id = 'sessionSummary';
+        summaryDiv.style.background = '#f1f5f9';
+        summaryDiv.style.borderRadius = '8px';
+        summaryDiv.style.padding = '10px';
+        summaryDiv.style.marginTop = '10px';
+        summaryDiv.style.fontSize = '0.95rem';
+        chatBox.parentNode.appendChild(summaryDiv);
+    }
+    summaryDiv.innerHTML = `<pre style='white-space:pre-wrap;'>${session.summary}</pre>`;
+}
 
-		setTimeout(() => {
-			const aiReplies = getAIResponses(question);
-			aiReplies.forEach(reply => addMessage(reply + '\n(존댓말로 안내드렸습니다.)', 'ai'));
-			// 유튜브 링크 추가
-			const yt = getYoutubeLink(question);
-			addMessage('더 자세한 설명은 유튜브에서 확인하실 수 있습니다: ' + yt, 'ai');
-			showExtraQuestions(question);
-		}, 700);
-	});
+function exportSessionAsMarkdown(session) {
+    const blob = new Blob([session.summary], {type: 'text/markdown'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${session.title || '대화요약'}.md`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+
+chatForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const question = userInput.value.trim();
+    if (!question) return;
+
+    // 새로운 주제(질문이 바뀌면) 세션 저장
+    if (currentSession.chat.length > 0 && question !== lastQuestion) {
+        saveCurrentSession();
+        chatBox.innerHTML = '';
+        let summaryDiv = document.getElementById('sessionSummary');
+        if(summaryDiv) summaryDiv.innerHTML = '';
+    }
+
+    addMessage(question, 'user');
+    userInput.value = '';
+    hideExtraQuestions();
+    lastQuestion = question;
+
+    setTimeout(() => {
+        const aiReplies = getAIResponses(question);
+        aiReplies.forEach(reply => addMessage(reply + '\n(존댓말로 안내드렸습니다.)', 'ai'));
+        const yt = getYoutubeLink(question);
+        addMessage('더 자세한 설명은 유튜브에서 확인하실 수 있습니다: ' + yt, 'ai');
+        showExtraQuestions(question, aiReplies[0]);
+    }, 700);
+});
+
+window.addEventListener('beforeunload', () => {
+    saveCurrentSession();
+});
 	</script>
 </body>
 </html>
