@@ -99,6 +99,7 @@
 <body>
 	<div class="chat-container">
 		<div class="title">무엇이 필요하신가요?</div>
+				<div class="chat-history-list" id="chatHistoryList" style="width:100%;margin-bottom:10px;display:none;"></div>
 		<div class="chat-box" id="chatBox">
 			<!-- 메시지 출력 영역 -->
 		</div>
@@ -106,48 +107,142 @@
 			<input type="text" id="userInput" placeholder="궁금한 점을 입력하세요..." autocomplete="off" required />
 			<button type="submit">질문</button>
 		</form>
+		<div class="extra-questions" id="extraQuestions" style="width:100%;margin-top:10px;display:none;"></div>
 	</div>
 	<script>
-		const chatBox = document.getElementById('chatBox');
-		const chatForm = document.getElementById('chatForm');
-		const userInput = document.getElementById('userInput');
+	// 대화 히스토리 및 상태 관리
+	const chatBox = document.getElementById('chatBox');
+	const chatForm = document.getElementById('chatForm');
+	const userInput = document.getElementById('userInput');
+	const chatHistoryList = document.getElementById('chatHistoryList');
+	const extraQuestions = document.getElementById('extraQuestions');
 
-		// AI 답변 예시 (실제 AI 연동은 서버/API 필요)
-		function getAIResponse(question) {
-			// 실제 서비스에서는 여러 AI API를 통합하여 답변을 선택해야 함
-			// 여기서는 예시 답변만 반환
-			const answers = [
-				'문제를 자세히 설명해주시면 더 정확한 도움을 드릴 수 있어요!',
-				'이 문제는 수학의 함수 개념과 관련이 있습니다. 혹시 함수의 정의를 알고 계신가요?',
-				'비슷한 질문이 있었는데, AI 서비스들은 이렇게 답변했어요: ...',
-				'조금 더 구체적으로 질문해주시면 여러 AI의 답변을 비교해드릴 수 있습니다.'
-			];
-			// 랜덤 답변
-			return answers[Math.floor(Math.random() * answers.length)];
+	let chatHistories = [];
+	let currentChat = [];
+	let lastQuestion = '';
+
+	// AI 모델별 답변 예시
+	const aiModels = [
+		{name: 'ChatGPT',
+		 reply: q => `ChatGPT의 답변입니다: \n${q}에 대해 자세히 설명드릴 수 있습니다. 궁금하신 점을 구체적으로 말씀해주시면 더욱 정확한 답변을 드릴 수 있습니다.`},
+		{name: 'Bard',
+		 reply: q => `Bard의 답변입니다: \n${q}에 대해 다양한 관점에서 설명드릴 수 있습니다. 추가로 궁금하신 점이 있으신가요?`},
+		{name: 'Claude',
+		 reply: q => `Claude의 답변입니다: \n${q}에 대해 친절하게 안내해드릴 수 있습니다. 더 자세한 설명이 필요하시면 말씀해 주세요.`}
+	];
+
+	// 유튜브 검색 (간단한 예시, 실제 API 연동 필요)
+	function getYoutubeLink(question) {
+		const query = encodeURIComponent(question);
+		return `https://www.youtube.com/results?search_query=${query}`;
+	}
+
+	// 추가 질문 예측 (간단 예시)
+	function predictExtraQuestions(question) {
+		if (question.includes('함수')) {
+			return ['그래프를 그려서 확인해보시겠습니까?', '함수의 실생활 예시가 궁금하신가요?'];
 		}
-
-		function addMessage(text, sender) {
-			const msgDiv = document.createElement('div');
-			msgDiv.className = 'message';
-			const bubble = document.createElement('div');
-			bubble.className = sender;
-			bubble.textContent = text;
-			msgDiv.appendChild(bubble);
-			chatBox.appendChild(msgDiv);
-			chatBox.scrollTop = chatBox.scrollHeight;
+		if (question.includes('미분')) {
+			return ['미분의 기하학적 의미를 설명해드릴까요?', '미분과 적분의 차이가 궁금하신가요?'];
 		}
+		return ['관련된 예시를 더 들어드릴까요?', '이와 비슷한 다른 개념이 궁금하신가요?'];
+	}
 
-		chatForm.addEventListener('submit', function(e) {
-			e.preventDefault();
-			const question = userInput.value.trim();
-			if (!question) return;
-			addMessage(question, 'user');
-			userInput.value = '';
-			setTimeout(() => {
-				const aiReply = getAIResponse(question);
-				addMessage(aiReply, 'ai');
-			}, 700); // 답변 딜레이
+	function addMessage(text, sender) {
+		const msgDiv = document.createElement('div');
+		msgDiv.className = 'message';
+		const bubble = document.createElement('div');
+		bubble.className = sender;
+		bubble.textContent = text;
+		msgDiv.appendChild(bubble);
+		chatBox.appendChild(msgDiv);
+		chatBox.scrollTop = chatBox.scrollHeight;
+		currentChat.push({text, sender});
+	}
+
+	function showExtraQuestions(question) {
+		extraQuestions.innerHTML = '';
+		const preds = predictExtraQuestions(question);
+		preds.forEach(q => {
+			const btn = document.createElement('button');
+			btn.textContent = q;
+			btn.style.marginRight = '8px';
+			btn.style.marginBottom = '4px';
+			btn.type = 'button'; // submit 방지
+			btn.onclick = () => {
+				userInput.value = q;
+				userInput.focus();
+			};
+			extraQuestions.appendChild(btn);
 		});
+		extraQuestions.style.display = 'block';
+	}
+
+	function hideExtraQuestions() {
+		extraQuestions.style.display = 'none';
+	}
+
+	function saveCurrentChat(question) {
+		if (currentChat.length > 0) {
+			chatHistories.push({question: lastQuestion, chat: currentChat});
+			updateHistoryList();
+			currentChat = [];
+		}
+		lastQuestion = question;
+	}
+
+	function updateHistoryList() {
+		if (chatHistories.length === 0) {
+			chatHistoryList.style.display = 'none';
+			return;
+		}
+		chatHistoryList.innerHTML = '<b>이전 대화 목록:</b><br>';
+		chatHistories.forEach((h, idx) => {
+			const btn = document.createElement('button');
+			btn.textContent = h.question;
+			btn.style.marginRight = '8px';
+			btn.type = 'button'; // submit 방지
+			btn.onclick = () => {
+				chatBox.innerHTML = '';
+				currentChat = [...h.chat]; // currentChat을 해당 대화로 교체
+				lastQuestion = h.question;
+				h.chat.forEach(m => addMessage(m.text, m.sender));
+				hideExtraQuestions();
+			};
+			chatHistoryList.appendChild(btn);
+		});
+		chatHistoryList.style.display = 'block';
+	}
+
+	function getAIResponses(question) {
+		// 여러 AI 모델의 답변을 모아 정리
+		return aiModels.map(model => model.reply(question));
+	}
+
+	chatForm.addEventListener('submit', function(e) {
+		e.preventDefault();
+		const question = userInput.value.trim();
+		if (!question) return;
+
+		// 새로운 질문이면 이전 대화 저장
+		if (currentChat.length > 0 && question !== lastQuestion) {
+			saveCurrentChat(question);
+			chatBox.innerHTML = '';
+		}
+
+		addMessage(question, 'user');
+		userInput.value = '';
+		hideExtraQuestions();
+
+		setTimeout(() => {
+			const aiReplies = getAIResponses(question);
+			aiReplies.forEach(reply => addMessage(reply + '\n(존댓말로 안내드렸습니다.)', 'ai'));
+			// 유튜브 링크 추가
+			const yt = getYoutubeLink(question);
+			addMessage('더 자세한 설명은 유튜브에서 확인하실 수 있습니다: ' + yt, 'ai');
+			showExtraQuestions(question);
+		}, 700);
+	});
 	</script>
 </body>
 </html>
